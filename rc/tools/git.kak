@@ -107,7 +107,7 @@ define-command -params 1.. \
             show-diff
             status
             update-diff
-    } -shell-script-candidates %{
+    } -shell-script-completion %{
     if [ $kak_token_to_complete -eq 0 ]; then
         printf %s\\n \
             add \
@@ -139,6 +139,8 @@ define-command -params 1.. \
             apply) printf -- "--reverse\n--cached\n--index\n--3way\n" ;;
             grep|edit) git ls-files -c --recurse-submodules ;;
         esac
+        fish -c 'complete -C "git $argv"' -- "$@" |
+            sed 's/\t.*//g' # remove descriptions
     fi
   } \
   git %{ evaluate-commands %sh{
