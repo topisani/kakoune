@@ -1,6 +1,7 @@
 #include "highlighters.hh"
 
 #include "assert.hh"
+#include "buffer.hh"
 #include "buffer_utils.hh"
 #include "changes.hh"
 #include "command_manager.hh"
@@ -16,6 +17,7 @@
 #include "regex.hh"
 #include "register_manager.hh"
 #include "string.hh"
+#include "unicode.hh"
 #include "utf8.hh"
 #include "utf8_iterator.hh"
 #include "window.hh"
@@ -1006,42 +1008,39 @@ private:
         const auto& buffer = context.context.buffer();
         for (auto& line : display_buffer.lines())
         {
+            auto is_whitespace = [](Codepoint cp) {
+                return cp == '\t' or cp == ' ' or cp == '\n' or cp == 0xA0 or cp == 0x202F;
+            };
+
+            auto last_non_space = line.range().begin;
+            if(m_only_trailing)
+            {
+                BufferIterator begin = get_iterator(buffer, line.range().begin);
+                BufferIterator end = get_iterator(buffer, line.range().end);
+                BufferIterator it = get_iterator(buffer, line.range().end);
+                while (true) {
+                    utf8::to_previous(it, begin); 
+                    if (it == begin or not is_whitespace(utf8::codepoint(it, end)))
+                        break;
+                }
+                last_non_space = it.coord();
+            }
+
             bool is_leading = true;
             for (auto atom_it = line.begin(); atom_it != line.end(); ++atom_it)
             {
-                if (atom_it->type() != DisplayAtom::Range)
-                    continue;
-
                 auto begin = get_iterator(buffer, atom_it->begin());
                 auto end = get_iterator(buffer, atom_it->end());
-                auto last_non_space = begin.coord();
-
-                auto is_whitespace = [](Codepoint cp) {
-                    return cp == '\t' or cp == ' ' or cp == '\n' or cp == 0xA0 or cp == 0x202F;
-                };
-
-                if(m_only_trailing)
-                {
-                    for (BufferIterator it = begin; it != end; )
-                    {
-                        if (not is_whitespace(utf8::read_codepoint(it, end)))
-                            last_non_space = it.coord();
-                    }
-                }
 
                 for (BufferIterator it = begin; it != end; )
                 {
                     auto coord = it.coord();
                     Codepoint cp = utf8::read_codepoint(it, end);
+                    String replacement;
                     if (is_whitespace(cp))
                     {
                         if (m_only_trailing and it.coord() <= last_non_space)
                             continue;
-
-                        if (coord != begin.coord())
-                            atom_it = ++line.split(atom_it, coord);
-                        if (it != end)
-                            atom_it = line.split(atom_it, it.coord());
 
                         if (not (m_no_leading and is_leading))
                         {
@@ -1049,27 +1048,34 @@ private:
                             {
                                 const ColumnCount column = get_column(buffer, tabstop, coord);
                                 const ColumnCount count = tabstop - (column % tabstop);
-                                atom_it->replace(m_tab + String(m_tabpad[(CharCount)0], count - m_tab.column_length()));
+                                replacement = m_tab + String(m_tabpad[(CharCount)0], count - m_tab.column_length());
                             }
                             else if (cp == ' ' and not m_spc.empty())
-                                atom_it->replace(m_spc);
+                                replacement = m_spc;
                             else if ((cp == 0xA0 or cp == 0x202F) and not m_nbsp.empty())
-                                atom_it->replace(m_nbsp);
+                                replacement = m_nbsp;
                         }
                         if (cp == '\n' and not m_lf.empty())
-                            atom_it->replace(m_lf);
+                            replacement = m_lf;
                         if (cp == ' ' and is_leading and indentwidth > 0 and not m_indent.empty())
                         {
                             const ColumnCount column = get_column(buffer, tabstop, coord);
                             if (column % indentwidth == 0 and column != 0)
-                                atom_it->replace(m_indent);
+                                replacement = m_indent;
                         } 
-                        atom_it->face = merge_faces(atom_it->face, face);
-                        break;
                     }
                     else
                     {
                         is_leading = false;
+                    }
+                    if (not replacement.empty()) {
+                        if (coord != begin.coord())
+                            atom_it = ++line.split(atom_it, coord);
+                        if (it != end)
+                            atom_it = line.split(atom_it, it.coord());
+                        atom_it->replace(std::move(replacement));
+                        atom_it->face = merge_faces(atom_it->face, face);
+                        break;
                     }
                 }
             }
