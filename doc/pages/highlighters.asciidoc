@@ -40,6 +40,9 @@ highlighter is replaced with the new one.
     display symbols on top of whitespaces to make them more explicit
     using the `Whitespace` face, with the following *options*:
 
+    *-face* <face>:::
+        a face to use instead of the default `Whitespace` face.
+
     *-lf* <separator>:::
         a one character long separator that will replace line feeds,
         or an empty string to ignore them.
@@ -62,7 +65,6 @@ highlighter is replaced with the new one.
     *-indent* <separator>:::
         a one character long separator that will replace the first space in indentation 
         according to the *indentwidth* option, or an empty string to ignore them.
-        This will use the `WhitespaceIndent` face.
 
     *-only-trailing*:::
         only highlight whitespaces at the end of the line
