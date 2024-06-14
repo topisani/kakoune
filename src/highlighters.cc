@@ -868,9 +868,10 @@ struct TabulationHighlighter : Highlighter
 };
 
 const HighlighterDesc show_whitespace_desc = {
-    "Parameters: [-tab <separator>] [-tabpad <separator>] [-lf <separator>] [-spc <separator>] [-nbsp <separator>] [-indent <separator>]\n"
+    "Parameters: [-face <face>] [-tab <separator>] [-tabpad <separator>] [-lf <separator>] [-spc <separator>] [-nbsp <separator>] [-indent <separator>]\n"
     "Display whitespaces using symbols",
     { {
+        { "face",   { ArgCompleter{}, "use this face instead of the default `Whitespace`" } },
         { "tab",    { ArgCompleter{}, "replace tabulations with the given character" } },
         { "tabpad", { ArgCompleter{}, "append as many of the given character as is necessary to honor `tabstop`" } },
         { "spc",    { ArgCompleter{}, "replace spaces with the given character" } },
@@ -884,8 +885,8 @@ const HighlighterDesc show_whitespace_desc = {
 };
 struct ShowWhitespacesHighlighter : Highlighter
 {
-    ShowWhitespacesHighlighter(String tab, String tabpad, String spc, String lf, String nbsp, String indent, bool only_trailing, bool no_leading)
-      : Highlighter{HighlightPass::Replace}, m_tab{std::move(tab)}, m_tabpad{std::move(tabpad)},
+    ShowWhitespacesHighlighter(String face, String tab, String tabpad, String spc, String lf, String nbsp, String indent, bool only_trailing, bool no_leading)
+      : Highlighter{HighlightPass::Replace}, m_face{face}, m_tab{std::move(tab)}, m_tabpad{std::move(tabpad)},
         m_spc{std::move(spc)}, m_lf{std::move(lf)}, m_nbsp{std::move(nbsp)}, m_indent{std::move(indent)},
         m_only_trailing{only_trailing}, m_no_leading{no_leading}
     {}
@@ -894,6 +895,7 @@ struct ShowWhitespacesHighlighter : Highlighter
     {
         ParametersParser parser(params, show_whitespace_desc.params);
 
+        auto face = parser.get_switch("face").value_or("Whitespace");
         bool only_trailing = (bool) parser.get_switch("only-trailing");
         bool no_leading = (bool) parser.get_switch("no-leading");
         auto get_param = [&](StringView param,  StringView fallback) {
@@ -904,6 +906,7 @@ struct ShowWhitespacesHighlighter : Highlighter
         };
 
         return make_unique_ptr<ShowWhitespacesHighlighter>(
+            face.str(),
             get_param("tab", "→"), get_param("tabpad", " "), get_param("spc", "·"),
             get_param("lf", "¬"), get_param("nbsp", "⍽"), get_param("indent", "│"), only_trailing, no_leading);
     }
@@ -913,8 +916,7 @@ private:
     {
         const int tabstop = context.context.options()["tabstop"].get<int>();
         const int indentwidth = context.context.options()["indentwidth"].get<int>();
-        auto whitespaceface = context.context.faces()["Whitespace"];
-        auto indentface = context.context.faces()["WhitespaceIndent"];
+        auto face = context.context.faces()[m_face];
         const auto& buffer = context.context.buffer();
         for (auto& line : display_buffer.lines())
         {
@@ -945,7 +947,6 @@ private:
                 {
                     auto coord = it.coord();
                     Codepoint cp = utf8::read_codepoint(it, end);
-                    auto face = whitespaceface;
                     if (is_whitespace(cp))
                     {
                         if (m_only_trailing and it.coord() <= last_non_space)
@@ -974,19 +975,9 @@ private:
                         if (cp == ' ' and is_leading and indentwidth > 0 and not m_indent.empty())
                         {
                             const ColumnCount column = get_column(buffer, tabstop, coord);
-                            if (column % indentwidth == 0 and column != 0) {
+                            if (column % indentwidth == 0 and column != 0)
                                 atom_it->replace(m_indent);
-                                face = indentface;
-                            }
-                            else
-                                atom_it->replace(m_spc);
                         }
-                        else if (cp == ' ' and not m_spc.empty())
-                            atom_it->replace(m_spc);
-                        else if (cp == '\n' and not m_lf.empty())
-                            atom_it->replace(m_lf);
-                        else if ((cp == 0xA0 or cp == 0x202F) and not m_nbsp.empty())
-                            atom_it->replace(m_nbsp);
                         atom_it->face = merge_faces(atom_it->face, face);
                         break;
                     }
@@ -999,7 +990,7 @@ private:
         }
     }
 
-    const String m_tab, m_tabpad, m_spc, m_lf, m_nbsp, m_indent;
+    const String m_face, m_tab, m_tabpad, m_spc, m_lf, m_nbsp, m_indent;
     const bool m_only_trailing, m_no_leading;
 };
 
