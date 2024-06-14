@@ -67,6 +67,9 @@ highlighter is replaced with the new one.
     *-only-trailing*:::
         only highlight whitespaces at the end of the line
 
+    *-no-leading*:::
+        do not highlight whitespace at the beginning of the line
+
 *number-lines* [options]::
     show line numbers using the `LineNumbers`, `LineNumberCursor` and `LineNumbersWrapped` faces,
     with the following *options*: 
