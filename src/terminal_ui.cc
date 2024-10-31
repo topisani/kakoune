@@ -9,6 +9,7 @@
 #include "format.hh"
 #include "diff.hh"
 #include "string_utils.hh"
+#include "unicode.hh"
 
 #include <algorithm>
 
@@ -827,10 +828,15 @@ Optional<Key> TerminalUI::get_next_key()
         auto masked_key = [&](Codepoint key, Codepoint shifted_key = 0) {
             int mask = std::max(params[1][0] - 1, 0);
             Key::Modifiers modifiers = parse_mask(mask);
-            if (shifted_key != 0 and (modifiers & Key::Modifiers::Shift))
+            if (modifiers & Key::Modifiers::Shift)
             {
-                modifiers &= ~Key::Modifiers::Shift;
-                key = shifted_key;
+                if (shifted_key == 0 and is_basic_alpha(key))
+                    shifted_key = to_upper(key);
+                if (shifted_key != 0)
+                {
+                    modifiers &= ~Key::Modifiers::Shift;
+                    key = shifted_key;
+                }
             }
             return Key{modifiers, key};
         };
