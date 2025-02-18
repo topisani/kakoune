@@ -24,6 +24,7 @@ released versions.
 
 * `git apply` can now operate on selected changes in the current buffer's
   file (useful for quick (un)staging and reverting)
+* Jujutsu VCS integration
 
 * `exec/eval -client` switch accepts '*' for all clients and comma separated
   list of client names.
